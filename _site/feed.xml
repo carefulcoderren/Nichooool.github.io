@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?><feed xmlns="http://www.w3.org/2005/Atom"><generator uri="http://jekyllrb.com" version="3.1.2">Jekyll</generator><link href="/feed.xml" rel="self" type="application/atom+xml" /><link href="/" rel="alternate" type="text/html" /><updated>2017-06-10T13:13:38+08:00</updated><id>/</id><title>Nichool</title><subtitle>一个有梦想的程序猿</subtitle><entry><title>RxJava 的线程控制使用与原理</title><link href="/rxjava%E7%BA%BF%E7%A8%8B%E8%B0%83%E5%BA%A6%E7%9A%84%E7%90%86%E8%A7%A3/" rel="alternate" type="text/html" title="RxJava 的线程控制使用与原理" /><published>2017-05-26T00:00:00+08:00</published><updated>2017-05-26T00:00:00+08:00</updated><id>/rxjava线程调度的理解</id><content type="html" xml:base="/rxjava%E7%BA%BF%E7%A8%8B%E8%B0%83%E5%BA%A6%E7%9A%84%E7%90%86%E8%A7%A3/">&lt;h3 id=&quot;rxjava-&quot;&gt;RxJava 的线程控制使用与原理&lt;/h3&gt;
+<?xml version="1.0" encoding="utf-8"?><feed xmlns="http://www.w3.org/2005/Atom"><generator uri="http://jekyllrb.com" version="3.1.2">Jekyll</generator><link href="https://nichooool.github.io//feed.xml" rel="self" type="application/atom+xml" /><link href="https://nichooool.github.io//" rel="alternate" type="text/html" /><updated>2017-06-10T13:21:10+08:00</updated><id>https://nichooool.github.io//</id><title>Nichool</title><subtitle>一个有梦想的程序猿</subtitle><entry><title>RxJava 的线程控制使用与原理</title><link href="https://nichooool.github.io//rxjava%E7%BA%BF%E7%A8%8B%E8%B0%83%E5%BA%A6%E7%9A%84%E7%90%86%E8%A7%A3/" rel="alternate" type="text/html" title="RxJava 的线程控制使用与原理" /><published>2017-05-26T00:00:00+08:00</published><updated>2017-05-26T00:00:00+08:00</updated><id>https://nichooool.github.io//rxjava线程调度的理解</id><content type="html" xml:base="https://nichooool.github.io//rxjava%E7%BA%BF%E7%A8%8B%E8%B0%83%E5%BA%A6%E7%9A%84%E7%90%86%E8%A7%A3/">&lt;h3 id=&quot;rxjava-&quot;&gt;RxJava 的线程控制使用与原理&lt;/h3&gt;
 
 &lt;blockquote&gt;
   &lt;p&gt;RxJava中的线程控制有两个方法&lt;/p&gt;
@@ -428,7 +428,7 @@
 
 &lt;hr /&gt;
 &lt;p&gt;&lt;strong&gt;上述分析请结合更详细的源码，这样有有助于更好地理解&lt;/strong&gt;
-分析过程中如若存在错误，请在下方评论处给予指正。&lt;/p&gt;</content><category term="blog" /><category term="rxjava" /><summary>深入理解subscribeOn与observeOn调用</summary></entry><entry><title>RxJava 对于’变换‘的理解</title><link href="/rxjava%E5%8F%98%E6%8D%A2%E7%9A%84%E6%B7%B1%E5%85%A5%E7%90%86%E8%A7%A3/" rel="alternate" type="text/html" title="RxJava 对于’变换‘的理解" /><published>2017-05-26T00:00:00+08:00</published><updated>2017-05-26T00:00:00+08:00</updated><id>/rxjava变换的深入理解</id><content type="html" xml:base="/rxjava%E5%8F%98%E6%8D%A2%E7%9A%84%E6%B7%B1%E5%85%A5%E7%90%86%E8%A7%A3/">&lt;h3 id=&quot;rxjava-rxjava&quot;&gt;RxJava 对于”变换”的理解（RxJava真正的核心）&lt;/h3&gt;
+分析过程中如若存在错误，请在下方评论处给予指正。&lt;/p&gt;</content><category term="blog" /><category term="rxjava" /><summary>深入理解subscribeOn与observeOn调用</summary></entry><entry><title>RxJava 对于’变换‘的理解</title><link href="https://nichooool.github.io//rxjava%E5%8F%98%E6%8D%A2%E7%9A%84%E6%B7%B1%E5%85%A5%E7%90%86%E8%A7%A3/" rel="alternate" type="text/html" title="RxJava 对于’变换‘的理解" /><published>2017-05-26T00:00:00+08:00</published><updated>2017-05-26T00:00:00+08:00</updated><id>https://nichooool.github.io//rxjava变换的深入理解</id><content type="html" xml:base="https://nichooool.github.io//rxjava%E5%8F%98%E6%8D%A2%E7%9A%84%E6%B7%B1%E5%85%A5%E7%90%86%E8%A7%A3/">&lt;h3 id=&quot;rxjava-rxjava&quot;&gt;RxJava 对于”变换”的理解（RxJava真正的核心）&lt;/h3&gt;
 
 &lt;blockquote&gt;
   &lt;p&gt;RxJava中常用的”变换”&lt;/p&gt;
@@ -552,7 +552,7 @@
 
 &lt;p&gt;RxJava中”变换”的核心就是将&lt;strong&gt;操作&lt;/strong&gt;封装成新的观察者，多个”变换“的链式操作也就是多个观察者与被观察者相互通知与处理的流程，整个RxJava项目通过这种代理的思想来实现复杂的逻辑。(&lt;em&gt;真心厉害！！！&lt;/em&gt;)&lt;/p&gt;
 
-&lt;p&gt;&lt;strong&gt;本文的分析将非常有助于线程调度方面的理解！！&lt;/strong&gt;&lt;/p&gt;</content><category term="blog" /><category term="rxjava" /><summary>Rx思想 - 一切操作皆‘变换’</summary></entry><entry><title>RxJava介绍</title><link href="/rxjava%E4%BB%8B%E7%BB%8D/" rel="alternate" type="text/html" title="RxJava介绍" /><published>2017-05-26T00:00:00+08:00</published><updated>2017-05-26T00:00:00+08:00</updated><id>/rxjava介绍</id><content type="html" xml:base="/rxjava%E4%BB%8B%E7%BB%8D/">&lt;h2 id=&quot;rxjava&quot;&gt;RxJava&lt;/h2&gt;
+&lt;p&gt;&lt;strong&gt;本文的分析将非常有助于线程调度方面的理解！！&lt;/strong&gt;&lt;/p&gt;</content><category term="blog" /><category term="rxjava" /><summary>Rx思想 - 一切操作皆‘变换’</summary></entry><entry><title>RxJava介绍</title><link href="https://nichooool.github.io//rxjava%E4%BB%8B%E7%BB%8D/" rel="alternate" type="text/html" title="RxJava介绍" /><published>2017-05-26T00:00:00+08:00</published><updated>2017-05-26T00:00:00+08:00</updated><id>https://nichooool.github.io//rxjava介绍</id><content type="html" xml:base="https://nichooool.github.io//rxjava%E4%BB%8B%E7%BB%8D/">&lt;h2 id=&quot;rxjava&quot;&gt;RxJava&lt;/h2&gt;
 
 &lt;blockquote&gt;
   &lt;p&gt;RxJava 是什么&lt;/p&gt;
