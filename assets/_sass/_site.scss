@@ -148,11 +148,11 @@ canvas {
 }
 
 .posts-link {
-  right: 90px;
+  right: 95px;
 }
 
 .projects-link {
-  right: 20px;
+  right: 35px;
 }
 
 .overlay {
@@ -392,7 +392,7 @@ canvas {
   color: $white;
   h1 {
     font-weight: bold;
-    text-transform: uppercase;
+    text-transform: none;
     letter-spacing: 1px;
   }
   h2 {

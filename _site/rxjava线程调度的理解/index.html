@@ -1,0 +1,296 @@
+<!DOCTYPE html> <html> <head> <meta charset="utf-8"> <meta http-equiv="X-UA-Compatible" content="IE=edge"> <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no"> <title>RxJava 的线程控制使用与原理 &#8211; Nichool</title> <meta name="description" content="深入理解subscribeOn与observeOn调用"> <meta name="keywords" content="blog, rxjava"> <!-- Twitter Cards --> <meta name="twitter:card" content="summary"> <meta name="twitter:image" content="head.jpg"> <meta name="twitter:title" content="RxJava 的线程控制使用与原理"> <meta name="twitter:description" content="深入理解subscribeOn与observeOn调用"> <!-- Open Graph --> <meta property="og:locale" content="en_US"> <meta property="og:type" content="article"> <meta property="og:title" content="RxJava 的线程控制使用与原理"> <meta property="og:description" content="深入理解subscribeOn与observeOn调用"> <meta property="og:url" content="/rxjava%E7%BA%BF%E7%A8%8B%E8%B0%83%E5%BA%A6%E7%9A%84%E7%90%86%E8%A7%A3/"> <meta property="og:site_name" content="Nichool"> <meta property="og:image" content="/images/head.jpg"> <link rel="canonical" href="/rxjava%E7%BA%BF%E7%A8%8B%E8%B0%83%E5%BA%A6%E7%9A%84%E7%90%86%E8%A7%A3/"> <!-- Handheld --> <meta name="HandheldFriendly" content="True"> <meta name="MobileOptimized" content="320"> <meta name="viewport" content="width=device-width, initial-scale=1.0"> <!-- Feed --> <link type="application/atom+xml" rel="alternate" href="/feed.xml" title="" /> <!-- Favicons --> <link rel="shortcut icon" type="image/png" href="/favicon.png" /> <link rel="shortcut icon" href="/favicon.ico" /> <!-- CSS --> <link rel="stylesheet" type="text/css" href="/assets/css/main.css"> <!-- Left Block Image for Posts --> <style type="text/css"> #posts.inner-post-page .block-left {background: linear-gradient(rgba(0, 0, 0, 0.5), rgba(0, 0, 0, 0.5)), url(/images/unsplash-gallery-image-3.jpg) no-repeat;background-size: cover;} </style> <!-- Left Block Images for Home and Pages --> <style type="text/css"> #posts .block-left {background: linear-gradient(rgba(0, 0, 0, 0.5), rgba(0, 0, 0, 0.5)), url(/images/unsplash-image-10.jpg) no-repeat;background-size: cover, cover;} .block-left {background: linear-gradient(rgba(44,45,51,0.9), rgba(44,45,51,0.9)), url(/images/home.png) no-repeat;background-size: cover;} </style> </head> <body id="posts" class="inner-post-page"> <div class="block-left"> <div class="content"> <a href="" class="logo"><img src="/images/head.jpg"></a> <div class="post-title-section"> <div class="section-line">Posts <em>/</em></div> <h1 class="section-title">RxJava 的线程控制使用与原理 </h1> <ul class="tags"> <li><a href="/tags#blog">blog</a></li> <li><a href="/tags#rxjava">rxjava</a></li> </ul> <div class="section-line reverse"><a href="/posts">Back to posts</a> <em>/</em></div> </div> </div> </div> <div class="block-right"> <div class="share-buttons"> <a href="https://twitter.com/intent/tweet?text=/rxjava%E7%BA%BF%E7%A8%8B%E8%B0%83%E5%BA%A6%E7%9A%84%E7%90%86%E8%A7%A3/" class="btn btn_twitter" title="Share on Twitter"><i class="fa fa-fw fa-twitter" aria-hidden="true"></i><span> Twitter</span></a> <a href="https://www.facebook.com/sharer/sharer.php?u=/rxjava%E7%BA%BF%E7%A8%8B%E8%B0%83%E5%BA%A6%E7%9A%84%E7%90%86%E8%A7%A3/" class="btn btn_facebook" title="Share on Facebook"><i class="fa fa-fw fa-facebook" aria-hidden="true"></i><span> Facebook</span></a> <a href="https://plus.google.com/share?url=/rxjava%E7%BA%BF%E7%A8%8B%E8%B0%83%E5%BA%A6%E7%9A%84%E7%90%86%E8%A7%A3/" class="btn btn_google-plus" title="Share on Google Plus"><i class="fa fa-fw fa-google-plus" aria-hidden="true"></i><span> Google+</span></a> </div> <a href="../posts.html" title="posts" class="posts-menu-icon"></a> <a title="projects" class="projects-menu-icon"> <span></span> </a> <div class="inner-post content"> <div class="date-highlight">26 May 2017</div> <h3 id="rxjava-">RxJava 的线程控制使用与原理</h3> <blockquote> <p>RxJava中的线程控制有两个方法</p> </blockquote> <ol> <li><code class="highlighter-rouge">subscribeOn</code> : 发生在通知流程(<strong>如果对通知流程与发送流程不理解的请查看我的《”变换”深入理解》</strong>)，指定的是当前<code class="highlighter-rouge">Observable.call()</code>方法以及之后所有操作的线程。(下面将会详细分析这一方法的作用)</li> <li><code class="highlighter-rouge">observeOn</code> : 发生在发送流程，指定的是当前<code class="highlighter-rouge">Subscriber.onNext()</code>方法以及之后的所有操作的线程。(同上)</li> </ol> <p>此方法有一个单参数：</p> <table> <thead> <tr> <th style="text-align: center">调度器类型</th> <th style="text-align: left">效果</th> </tr> </thead> <tbody> <tr> <td style="text-align: center">Schedulers.computation()</td> <td style="text-align: left">用于计算任务，如事件循环或和回调处理，不要用于IO操作(IO操作请使用Schedulers.io())；默认线程数等于处理器的数量</td> </tr> <tr> <td style="text-align: center">Schedulers.from(executor)</td> <td style="text-align: left">使用指定的Executor作为调度器</td> </tr> <tr> <td style="text-align: center">Schedulers.immediate()</td> <td style="text-align: left">在当前线程立即开始执行任务</td> </tr> <tr> <td style="text-align: center">Schedulers.io()</td> <td style="text-align: left">用于IO密集型任务，如异步阻塞IO操作，这个调度器的线程池会根据需要增长；对于普通的计算任务，请使用Schedulers.computation()；Schedulers.io()默认是一个CachedThreadScheduler，很像一个有线程缓存的新线程调度器</td> </tr> <tr> <td style="text-align: center">Schedulers.newThread()</td> <td style="text-align: left">为每个任务创建一个新线程</td> </tr> <tr> <td style="text-align: center">Schedulers.trampoline()</td> <td style="text-align: left">当其它排队的任务完成后，在当前线程排队开始执行</td> </tr> </tbody> </table> <p>一个常见的线程控制的例子：</p> <div class="highlighter-rouge"><pre class="highlight"><code><span class="n">Observable</span><span class="o">.</span><span class="na">just</span><span class="o">(</span><span class="s">"hello"</span><span class="err">，</span> <span class="s">"my"</span><span class="err">，</span> <span class="s">"name"</span><span class="err">，</span> <span class="s">"is"</span><span class="err">，</span> <span class="s">"nichool"</span><span class="o">)</span>
+               <span class="o">.</span><span class="na">map</span><span class="o">(</span><span class="k">new</span> <span class="n">Func1</span><span class="o">&lt;</span><span class="n">String</span><span class="err">，</span> <span class="n">String</span><span class="o">&gt;()</span> <span class="o">{</span>
+                   <span class="nd">@Override</span>
+                   <span class="kd">public</span> <span class="n">String</span> <span class="n">call</span><span class="o">(</span><span class="n">String</span> <span class="n">s</span><span class="o">)</span> <span class="o">{</span>
+                      <span class="c1">//在io线程中 执行</span>
+                       <span class="n">LogUtils</span><span class="o">.</span><span class="na">LogW</span><span class="o">(</span><span class="s">"return "</span> <span class="o">+</span> <span class="s">" map: "</span> <span class="o">+</span> <span class="n">s</span> <span class="o">+</span> <span class="s">" "</span> <span class="o">+</span> <span class="n">Thread</span><span class="o">.</span><span class="na">currentThread</span><span class="o">().</span><span class="na">getName</span><span class="o">());</span>
+                       <span class="k">return</span> <span class="s">" map: "</span> <span class="o">+</span> <span class="n">s</span><span class="o">;</span>
+                   <span class="o">}</span>
+               <span class="o">})</span>
+               <span class="o">.</span><span class="na">subscribeOn</span><span class="o">(</span><span class="n">Schedulers</span><span class="o">.</span><span class="na">io</span><span class="o">())</span>
+               <span class="o">.</span><span class="na">observeOn</span><span class="o">(</span><span class="n">AndroidSchedulers</span><span class="o">.</span><span class="na">mainThread</span><span class="o">())</span>
+               <span class="o">.</span><span class="na">subscribe</span><span class="o">(</span><span class="k">new</span> <span class="n">Subscriber</span><span class="o">&lt;</span><span class="n">String</span><span class="o">&gt;()</span> <span class="o">{</span>
+                   <span class="nd">@Override</span>
+                   <span class="kd">public</span> <span class="kt">void</span> <span class="n">onStart</span><span class="o">()</span> <span class="o">{</span>
+                       <span class="kd">super</span><span class="o">.</span><span class="na">onStart</span><span class="o">();</span>
+                       <span class="c1">//在主线程中执行</span>
+                       <span class="n">LogUtils</span><span class="o">.</span><span class="na">LogW</span><span class="o">(</span><span class="s">" onStart "</span> <span class="o">+</span> <span class="n">Thread</span><span class="o">.</span><span class="na">currentThread</span><span class="o">().</span><span class="na">getName</span><span class="o">());</span>
+                   <span class="o">}</span>
+
+                   <span class="nd">@Override</span>
+                   <span class="kd">public</span> <span class="kt">void</span> <span class="n">onCompleted</span><span class="o">()</span> <span class="o">{</span>
+                       <span class="c1">//在主线程中执行</span>
+                       <span class="n">LogUtils</span><span class="o">.</span><span class="na">LogW</span><span class="o">(</span><span class="s">" onCompleted "</span> <span class="o">+</span> <span class="n">Thread</span><span class="o">.</span><span class="na">currentThread</span><span class="o">().</span><span class="na">getName</span><span class="o">());</span>
+                   <span class="o">}</span>
+
+                   <span class="nd">@Override</span>
+                   <span class="kd">public</span> <span class="kt">void</span> <span class="n">onError</span><span class="o">(</span><span class="n">Throwable</span> <span class="n">e</span><span class="o">)</span> <span class="o">{</span>
+                       <span class="n">LogUtils</span><span class="o">.</span><span class="na">LogW</span><span class="o">(</span><span class="s">" onError "</span> <span class="o">+</span> <span class="n">Thread</span><span class="o">.</span><span class="na">currentThread</span><span class="o">().</span><span class="na">getName</span><span class="o">());</span>
+                   <span class="o">}</span>
+
+                   <span class="nd">@Override</span>
+                   <span class="kd">public</span> <span class="kt">void</span> <span class="n">onNext</span><span class="o">(</span><span class="n">String</span> <span class="n">s</span><span class="o">)</span> <span class="o">{</span>
+                       <span class="c1">//在主线程中执行</span>
+                       <span class="n">LogUtils</span><span class="o">.</span><span class="na">LogW</span><span class="o">(</span><span class="s">" onNext( "</span> <span class="o">+</span> <span class="n">s</span> <span class="o">+</span> <span class="s">" ) "</span> <span class="o">+</span> <span class="n">Thread</span><span class="o">.</span><span class="na">currentThread</span><span class="o">().</span><span class="na">getName</span><span class="o">());</span>
+                   <span class="o">}</span>
+               <span class="o">});</span>
+</code></pre></div> <p>打印的Log:</p> <div class="highlighter-rouge"><pre class="highlight"><code>     <span class="nl">RxJavaDemo:</span>  <span class="n">onStart</span> <span class="n">main</span>
+     <span class="nl">RxJavaDemo:</span> <span class="k">return</span>  <span class="nl">map:</span> <span class="n">hello</span> <span class="n">RxIoScheduler</span><span class="o">-</span><span class="mi">2</span>
+     <span class="nl">RxJavaDemo:</span> <span class="k">return</span>  <span class="nl">map:</span> <span class="n">my</span> <span class="n">RxIoScheduler</span><span class="o">-</span><span class="mi">2</span>
+     <span class="nl">RxJavaDemo:</span>  <span class="n">onNext</span><span class="o">(</span>  <span class="nl">map:</span> <span class="n">hello</span> <span class="o">)</span> <span class="n">main</span>
+     <span class="nl">RxJavaDemo:</span> <span class="k">return</span>  <span class="nl">map:</span> <span class="n">name</span> <span class="n">RxIoScheduler</span><span class="o">-</span><span class="mi">2</span>
+     <span class="nl">RxJavaDemo:</span>  <span class="n">onNext</span><span class="o">(</span>  <span class="nl">map:</span> <span class="n">my</span> <span class="o">)</span> <span class="n">main</span>
+     <span class="nl">RxJavaDemo:</span> <span class="k">return</span>  <span class="nl">map:</span> <span class="n">is</span> <span class="n">RxIoScheduler</span><span class="o">-</span><span class="mi">2</span>
+     <span class="nl">RxJavaDemo:</span>  <span class="n">onNext</span><span class="o">(</span>  <span class="nl">map:</span> <span class="n">name</span> <span class="o">)</span> <span class="n">main</span>
+     <span class="nl">RxJavaDemo:</span> <span class="k">return</span>  <span class="nl">map:</span> <span class="n">nichool</span> <span class="n">RxIoScheduler</span><span class="o">-</span><span class="mi">2</span>
+     <span class="nl">RxJavaDemo:</span>  <span class="n">onNext</span><span class="o">(</span>  <span class="nl">map:</span> <span class="n">is</span> <span class="o">)</span> <span class="n">main</span>
+     <span class="nl">RxJavaDemo:</span>  <span class="n">onNext</span><span class="o">(</span>  <span class="nl">map:</span> <span class="n">nichool</span> <span class="o">)</span> <span class="n">main</span>
+     <span class="nl">RxJavaDemo:</span>  <span class="n">onCompleted</span> <span class="n">main</span>
+</code></pre></div> <blockquote> <p>为了更好在使用以上两种方法来控制线程，我们就来分析下原理吧。</p> </blockquote> <p>在RxJava中所有的操作都是一次”变换” (关于”变换”的理解请查看我的《”变换”深入理解》)， 同样<code class="highlighter-rouge">subscribeOn</code>与<code class="highlighter-rouge">observeOn</code>也是一种”变换”。</p> <p><strong>废话不多说了，快请上我源码大人！！</strong></p> <ol> <li> <p>subscribeOn 源码分析：</p> <div class="highlighter-rouge"><pre class="highlight"><code> <span class="c1">//Observable.java</span>
+ <span class="kd">public</span> <span class="kd">final</span> <span class="n">Observable</span><span class="o">&lt;</span><span class="n">T</span><span class="o">&gt;</span> <span class="n">subscribeOn</span><span class="o">(</span><span class="n">Scheduler</span> <span class="n">scheduler</span><span class="o">)</span> <span class="o">{</span>
+      <span class="k">if</span> <span class="o">(</span><span class="k">this</span> <span class="k">instanceof</span> <span class="n">ScalarSynchronousObservable</span><span class="o">)</span> <span class="o">{</span>
+          <span class="k">return</span> <span class="o">((</span><span class="n">ScalarSynchronousObservable</span><span class="o">&lt;</span><span class="n">T</span><span class="o">&gt;)</span><span class="k">this</span><span class="o">).</span><span class="na">scalarScheduleOn</span><span class="o">(</span><span class="n">scheduler</span><span class="o">);</span>
+      <span class="o">}</span>
+      <span class="k">return</span> <span class="n">create</span><span class="o">(</span><span class="k">new</span> <span class="n">OperatorSubscribeOn</span><span class="o">&lt;</span><span class="n">T</span><span class="o">&gt;(</span><span class="k">this</span><span class="err">，</span> <span class="n">scheduler</span><span class="o">));</span>
+  <span class="o">}</span>
+
+  <span class="c1">//OperatorSubscribeOn.java</span>
+  <span class="nd">@Override</span>
+  <span class="kd">public</span> <span class="kt">void</span> <span class="n">call</span><span class="o">(</span><span class="kd">final</span> <span class="n">Subscriber</span><span class="o">&lt;?</span> <span class="kd">super</span> <span class="n">T</span><span class="o">&gt;</span> <span class="n">subscriber</span><span class="o">)</span> <span class="o">{</span>
+      <span class="kd">final</span> <span class="n">Worker</span> <span class="n">inner</span> <span class="o">=</span> <span class="n">scheduler</span><span class="o">.</span><span class="na">createWorker</span><span class="o">();</span>
+      <span class="n">subscriber</span><span class="o">.</span><span class="na">add</span><span class="o">(</span><span class="n">inner</span><span class="o">);</span>
+
+      <span class="n">inner</span><span class="o">.</span><span class="na">schedule</span><span class="o">(</span><span class="k">new</span> <span class="n">Action0</span><span class="o">()</span> <span class="o">{</span>
+          <span class="nd">@Override</span>
+          <span class="kd">public</span> <span class="kt">void</span> <span class="n">call</span><span class="o">()</span> <span class="o">{</span>
+              <span class="kd">final</span> <span class="n">Thread</span> <span class="n">t</span> <span class="o">=</span> <span class="n">Thread</span><span class="o">.</span><span class="na">currentThread</span><span class="o">();</span>
+
+              <span class="n">Subscriber</span><span class="o">&lt;</span><span class="n">T</span><span class="o">&gt;</span> <span class="n">s</span> <span class="o">=</span> <span class="k">new</span> <span class="n">Subscriber</span><span class="o">&lt;</span><span class="n">T</span><span class="o">&gt;(</span><span class="n">subscriber</span><span class="o">)</span> <span class="o">{</span>
+                  <span class="nd">@Override</span>
+                  <span class="kd">public</span> <span class="kt">void</span> <span class="n">onNext</span><span class="o">(</span><span class="n">T</span> <span class="n">t</span><span class="o">)</span> <span class="o">{</span>
+                      <span class="n">subscriber</span><span class="o">.</span><span class="na">onNext</span><span class="o">(</span><span class="n">t</span><span class="o">);</span>
+                  <span class="o">}</span>
+
+                  <span class="nd">@Override</span>
+                  <span class="kd">public</span> <span class="kt">void</span> <span class="n">onError</span><span class="o">(</span><span class="n">Throwable</span> <span class="n">e</span><span class="o">)</span> <span class="o">{</span>
+                      <span class="k">try</span> <span class="o">{</span>
+                          <span class="n">subscriber</span><span class="o">.</span><span class="na">onError</span><span class="o">(</span><span class="n">e</span><span class="o">);</span>
+                      <span class="o">}</span> <span class="k">finally</span> <span class="o">{</span>
+                          <span class="n">inner</span><span class="o">.</span><span class="na">unsubscribe</span><span class="o">();</span>
+                      <span class="o">}</span>
+                  <span class="o">}</span>
+
+                  <span class="nd">@Override</span>
+                  <span class="kd">public</span> <span class="kt">void</span> <span class="n">onCompleted</span><span class="o">()</span> <span class="o">{</span>
+                      <span class="k">try</span> <span class="o">{</span>
+                          <span class="n">subscriber</span><span class="o">.</span><span class="na">onCompleted</span><span class="o">();</span>
+                      <span class="o">}</span> <span class="k">finally</span> <span class="o">{</span>
+                          <span class="n">inner</span><span class="o">.</span><span class="na">unsubscribe</span><span class="o">();</span>
+                      <span class="o">}</span>
+                  <span class="o">}</span>
+
+                  <span class="o">...</span>
+              <span class="o">};</span>
+
+              <span class="n">source</span><span class="o">.</span><span class="na">unsafeSubscribe</span><span class="o">(</span><span class="n">s</span><span class="o">);</span>
+          <span class="o">}</span>
+      <span class="o">});</span>
+  <span class="o">}</span>
+
+  <span class="c1">//Observable.java</span>
+  <span class="kd">public</span> <span class="kd">final</span> <span class="n">Subscription</span> <span class="n">unsafeSubscribe</span><span class="o">(</span><span class="n">Subscriber</span><span class="o">&lt;?</span> <span class="kd">super</span> <span class="n">T</span><span class="o">&gt;</span> <span class="n">subscriber</span><span class="o">)</span> <span class="o">{</span>
+       <span class="k">try</span> <span class="o">{</span>
+           <span class="c1">// new Subscriber so onStart it</span>
+           <span class="n">subscriber</span><span class="o">.</span><span class="na">onStart</span><span class="o">();</span>
+           <span class="c1">// allow the hook to intercept and/or decorate</span>
+           <span class="n">hook</span><span class="o">.</span><span class="na">onSubscribeStart</span><span class="o">(</span><span class="k">this</span><span class="err">，</span> <span class="n">onSubscribe</span><span class="o">).</span><span class="na">call</span><span class="o">(</span><span class="n">subscriber</span><span class="o">);</span>
+           <span class="k">return</span> <span class="n">hook</span><span class="o">.</span><span class="na">onSubscribeReturn</span><span class="o">(</span><span class="n">subscriber</span><span class="o">);</span>
+       <span class="o">}</span> <span class="k">catch</span> <span class="o">(</span><span class="n">Throwable</span> <span class="n">e</span><span class="o">)</span> <span class="o">{</span>
+           <span class="o">...</span>
+       <span class="o">}</span>
+   <span class="o">}</span>
+</code></pre></div> </li> </ol> <p>通过上面的源码我们得知流程如下： <code class="highlighter-rouge">subscribeOn</code> 通过<code class="highlighter-rouge">Create(new OperatorSubscribeOn&lt;T&gt;(this， scheduler))</code>方法创建一个新的<code class="highlighter-rouge">Observable</code>，这个新的<code class="highlighter-rouge">Observable</code>的<code class="highlighter-rouge">call</code>方法中，通过指定的<code class="highlighter-rouge">Scheduler</code>开启任务，任务中创建一个新的<code class="highlighter-rouge">Subscriber</code>，然后通知父<code class="highlighter-rouge">Observable</code>来处理<code class="highlighter-rouge">Subscriber</code>。</p> <p>总结 ： <code class="highlighter-rouge">subscribeOn</code>方法创建了一个新的<code class="highlighter-rouge">Observable</code>（被观察者），当这个新的<code class="highlighter-rouge">Observable</code>被通知的时候，在指定线程中执行后面的操作（封装<code class="highlighter-rouge">subscriber</code>，通知父<code class="highlighter-rouge">Observable</code>）。<strong>其实分析到这里也就解释了<code class="highlighter-rouge">subscribeOn</code>就是一种”变换”，只不过具体操作不一样</strong></p> <p>上面源码中有这么一段逻辑，作者我查看ScalarSynchronousObservable源码得知只有在Observable.just(T t).subscribeOn()时会进入，这段逻辑内部也包含上面类似的逻辑，只不过加入了针对的处理。</p> <div class="highlighter-rouge"><pre class="highlight"><code>   <span class="k">if</span> <span class="o">(</span><span class="k">this</span> <span class="k">instanceof</span> <span class="n">ScalarSynchronousObservable</span><span class="o">)</span> <span class="o">{</span>
+       <span class="k">return</span> <span class="o">((</span><span class="n">ScalarSynchronousObservable</span><span class="o">&lt;</span><span class="n">T</span><span class="o">&gt;)</span><span class="k">this</span><span class="o">).</span><span class="na">scalarScheduleOn</span><span class="o">(</span><span class="n">scheduler</span><span class="o">);</span>
+   <span class="o">}</span>
+</code></pre></div> <ol> <li>observeOn 源码分析：</li> </ol> <div class="highlighter-rouge"><pre class="highlight"><code>  <span class="c1">//Observable.java</span>
+  <span class="kd">public</span> <span class="kd">final</span> <span class="n">Observable</span><span class="o">&lt;</span><span class="n">T</span><span class="o">&gt;</span> <span class="n">observeOn</span><span class="o">(</span><span class="n">Scheduler</span> <span class="n">scheduler</span><span class="err">，</span> <span class="kt">boolean</span> <span class="n">delayError</span><span class="err">，</span> <span class="kt">int</span> <span class="n">bufferSize</span><span class="o">)</span> <span class="o">{</span>
+        <span class="k">if</span> <span class="o">(</span><span class="k">this</span> <span class="k">instanceof</span> <span class="n">ScalarSynchronousObservable</span><span class="o">)</span> <span class="o">{</span>
+            <span class="k">return</span> <span class="o">((</span><span class="n">ScalarSynchronousObservable</span><span class="o">&lt;</span><span class="n">T</span><span class="o">&gt;)</span><span class="k">this</span><span class="o">).</span><span class="na">scalarScheduleOn</span><span class="o">(</span><span class="n">scheduler</span><span class="o">);</span>
+        <span class="o">}</span>
+        <span class="k">return</span> <span class="n">lift</span><span class="o">(</span><span class="k">new</span> <span class="n">OperatorObserveOn</span><span class="o">&lt;</span><span class="n">T</span><span class="o">&gt;(</span><span class="n">scheduler</span><span class="err">，</span> <span class="n">delayError</span><span class="err">，</span> <span class="n">bufferSize</span><span class="o">));</span>
+    <span class="o">}</span>
+
+  <span class="c1">//OperatorObserveOn.java</span>
+  <span class="nd">@Override</span>
+  <span class="kd">public</span> <span class="n">Subscriber</span><span class="o">&lt;?</span> <span class="kd">super</span> <span class="n">T</span><span class="o">&gt;</span> <span class="n">call</span><span class="o">(</span><span class="n">Subscriber</span><span class="o">&lt;?</span> <span class="kd">super</span> <span class="n">T</span><span class="o">&gt;</span> <span class="n">child</span><span class="o">)</span> <span class="o">{</span>
+      <span class="k">if</span> <span class="o">(</span><span class="n">scheduler</span> <span class="k">instanceof</span> <span class="n">ImmediateScheduler</span><span class="o">)</span> <span class="o">{</span>
+          <span class="c1">// avoid overhead， execute directly</span>
+          <span class="k">return</span> <span class="n">child</span><span class="o">;</span>
+      <span class="o">}</span> <span class="k">else</span> <span class="k">if</span> <span class="o">(</span><span class="n">scheduler</span> <span class="k">instanceof</span> <span class="n">TrampolineScheduler</span><span class="o">)</span> <span class="o">{</span>
+          <span class="c1">// avoid overhead， execute directly</span>
+          <span class="k">return</span> <span class="n">child</span><span class="o">;</span>
+      <span class="o">}</span> <span class="k">else</span> <span class="o">{</span>
+          <span class="n">ObserveOnSubscriber</span><span class="o">&lt;</span><span class="n">T</span><span class="o">&gt;</span> <span class="n">parent</span> <span class="o">=</span> <span class="k">new</span> <span class="n">ObserveOnSubscriber</span><span class="o">&lt;</span><span class="n">T</span><span class="o">&gt;(</span><span class="n">scheduler</span><span class="err">，</span> <span class="n">child</span><span class="err">，</span> <span class="n">delayError</span><span class="err">，</span> <span class="n">bufferSize</span><span class="o">);</span>
+          <span class="n">parent</span><span class="o">.</span><span class="na">init</span><span class="o">();</span>
+          <span class="k">return</span> <span class="n">parent</span><span class="o">;</span>
+      <span class="o">}</span>
+  <span class="o">}</span>
+
+  <span class="c1">//OperatorObserveOn$ObserveOnSubscriber.java</span>
+  <span class="nd">@Override</span>
+  <span class="kd">public</span> <span class="kt">void</span> <span class="n">onNext</span><span class="o">(</span><span class="kd">final</span> <span class="n">T</span> <span class="n">t</span><span class="o">)</span> <span class="o">{</span>
+      <span class="k">if</span> <span class="o">(</span><span class="n">isUnsubscribed</span><span class="o">()</span> <span class="o">||</span> <span class="n">finished</span><span class="o">)</span> <span class="o">{</span>
+          <span class="k">return</span><span class="o">;</span>
+      <span class="o">}</span>
+      <span class="k">if</span> <span class="o">(!</span><span class="n">queue</span><span class="o">.</span><span class="na">offer</span><span class="o">(</span><span class="n">on</span><span class="o">.</span><span class="na">next</span><span class="o">(</span><span class="n">t</span><span class="o">)))</span> <span class="o">{</span>
+          <span class="n">onError</span><span class="o">(</span><span class="k">new</span> <span class="n">MissingBackpressureException</span><span class="o">());</span>
+          <span class="k">return</span><span class="o">;</span>
+      <span class="o">}</span>
+      <span class="n">schedule</span><span class="o">();</span>
+  <span class="o">}</span>
+
+  <span class="nd">@Override</span>
+  <span class="kd">public</span> <span class="kt">void</span> <span class="n">onCompleted</span><span class="o">()</span> <span class="o">{</span>
+      <span class="k">if</span> <span class="o">(</span><span class="n">isUnsubscribed</span><span class="o">()</span> <span class="o">||</span> <span class="n">finished</span><span class="o">)</span> <span class="o">{</span>
+          <span class="k">return</span><span class="o">;</span>
+      <span class="o">}</span>
+      <span class="n">finished</span> <span class="o">=</span> <span class="kc">true</span><span class="o">;</span>
+      <span class="n">schedule</span><span class="o">();</span>
+  <span class="o">}</span>
+
+  <span class="nd">@Override</span>
+  <span class="kd">public</span> <span class="kt">void</span> <span class="n">onError</span><span class="o">(</span><span class="kd">final</span> <span class="n">Throwable</span> <span class="n">e</span><span class="o">)</span> <span class="o">{</span>
+      <span class="k">if</span> <span class="o">(</span><span class="n">isUnsubscribed</span><span class="o">()</span> <span class="o">||</span> <span class="n">finished</span><span class="o">)</span> <span class="o">{</span>
+          <span class="n">RxJavaPlugins</span><span class="o">.</span><span class="na">getInstance</span><span class="o">().</span><span class="na">getErrorHandler</span><span class="o">().</span><span class="na">handleError</span><span class="o">(</span><span class="n">e</span><span class="o">);</span>
+          <span class="k">return</span><span class="o">;</span>
+      <span class="o">}</span>
+      <span class="n">error</span> <span class="o">=</span> <span class="n">e</span><span class="o">;</span>
+      <span class="n">finished</span> <span class="o">=</span> <span class="kc">true</span><span class="o">;</span>
+      <span class="n">schedule</span><span class="o">();</span>
+  <span class="o">}</span>
+
+  <span class="kd">protected</span> <span class="kt">void</span> <span class="n">schedule</span><span class="o">()</span> <span class="o">{</span>
+      <span class="k">if</span> <span class="o">(</span><span class="n">counter</span><span class="o">.</span><span class="na">getAndIncrement</span><span class="o">()</span> <span class="o">==</span> <span class="mi">0</span><span class="o">)</span> <span class="o">{</span>
+          <span class="n">recursiveScheduler</span><span class="o">.</span><span class="na">schedule</span><span class="o">(</span><span class="k">this</span><span class="o">);</span>
+      <span class="o">}</span>
+  <span class="o">}</span>
+
+  <span class="c1">// only execute this from schedule()</span>
+  <span class="nd">@Override</span>
+  <span class="kd">public</span> <span class="kt">void</span> <span class="n">call</span><span class="o">()</span> <span class="o">{</span>
+      <span class="c1">//recursiveScheduler.schedule(this) 在这里执行</span>
+      <span class="o">...</span>
+      <span class="kd">final</span> <span class="n">Subscriber</span><span class="o">&lt;?</span> <span class="kd">super</span> <span class="n">T</span><span class="o">&gt;</span> <span class="n">localChild</span> <span class="o">=</span> <span class="k">this</span><span class="o">.</span><span class="na">child</span><span class="o">;</span>
+      <span class="o">...</span>
+      <span class="k">for</span> <span class="o">(;;)</span> <span class="o">{</span>
+          <span class="kt">long</span> <span class="n">requestAmount</span> <span class="o">=</span> <span class="n">requested</span><span class="o">.</span><span class="na">get</span><span class="o">();</span>
+
+          <span class="k">while</span> <span class="o">(</span><span class="n">requestAmount</span> <span class="o">!=</span> <span class="n">currentEmission</span><span class="o">)</span> <span class="o">{</span>
+              <span class="kt">boolean</span> <span class="n">done</span> <span class="o">=</span> <span class="n">finished</span><span class="o">;</span>
+              <span class="n">Object</span> <span class="n">v</span> <span class="o">=</span> <span class="n">q</span><span class="o">.</span><span class="na">poll</span><span class="o">();</span>
+              <span class="kt">boolean</span> <span class="n">empty</span> <span class="o">=</span> <span class="n">v</span> <span class="o">==</span> <span class="kc">null</span><span class="o">;</span>
+
+              <span class="k">if</span> <span class="o">(</span><span class="n">empty</span><span class="o">)</span> <span class="o">{</span>
+                  <span class="k">break</span><span class="o">;</span>
+              <span class="o">}</span>
+
+              <span class="n">localChild</span><span class="o">.</span><span class="na">onNext</span><span class="o">(</span><span class="n">localOn</span><span class="o">.</span><span class="na">getValue</span><span class="o">(</span><span class="n">v</span><span class="o">));</span>
+              <span class="o">...</span>
+          <span class="o">}</span>
+      <span class="o">}</span>
+  <span class="o">}</span>
+</code></pre></div> <p>通过上面的源码我们得知流程如下： <code class="highlighter-rouge">observeOn</code> 通过<code class="highlighter-rouge">lift(new OperatorObserveOn&lt;T&gt;())</code> 创建一个新的<code class="highlighter-rouge">Observable</code>(<code class="highlighter-rouge">left()</code>不再赘述, 请查看我的《”变换”深入理解》），在<code class="highlighter-rouge">OperatorObserveOn.call</code>方法中当判断scheduler为当前线程则不予处理直接返回，其他情况则通过<code class="highlighter-rouge">ObserveOnSubscriber</code>来封装传入的<code class="highlighter-rouge">Subscriber</code>生成一个新的Subscriber。在新的Subscriber的实现中，都会调用<code class="highlighter-rouge">schedule()</code>方法来指定线程执行<code class="highlighter-rouge">Subscriber.onNext()</code> (调用<code class="highlighter-rouge">this.call()</code>).</p> <blockquote> <p>总结 (<strong>重点</strong>)</p> </blockquote> <p><code class="highlighter-rouge">observeOn</code> 和 <code class="highlighter-rouge">subscribeOn</code> 一样都是指定线程来完成后面的逻辑，<strong>区别在于subscribeOn是作用在通知时<code class="highlighter-rouge">Observable.call()</code>，也就是它通知流程的后面逻辑（可能包括发送流程），observeOn是作用在发送时<code class="highlighter-rouge">Subscriber.onNext()</code>。也就是它的发送流程后面的逻辑。</strong></p> <p>综上所述可以合并成这样一张流程图 <a href="https://gank.io/post/560e15be2dca930e00da1083#toc_15">下图来源</a>： <img src="../images/rxjava/rxjava2.jpg" alt="流程图" /></p> <p>右边是对应的代码，左边流程图是具体的内部变化。不同颜色的线代表着在不同的线程中执行，向上是通知流程<code class="highlighter-rouge">Observable.call()</code>，向下是发送流程<code class="highlighter-rouge">Subscriber.next()</code>。<strong>特别注意:请看红色的线，由于<code class="highlighter-rouge">subscribeOn</code>导致切换了线程，并且后面没有<code class="highlighter-rouge">observeOn</code>切换线程，所以第一个<code class="highlighter-rouge">left()</code>将在<code class="highlighter-rouge">subscribeOn</code>指定的线程中执行。</strong></p> <p>请大家结合上面的分析以及这个流程图好好理解下RxJava的线程控制。</p> <blockquote> <p>延展</p> </blockquote> <p>有这样一个常见的问题，请看下面的代码。</p> <div class="highlighter-rouge"><pre class="highlight"><code><span class="k">new</span> <span class="nf">Thread</span><span class="p">(</span><span class="o">)</span> <span class="o">{</span>
+  <span class="nd">@Override</span>
+  <span class="kd">public</span> <span class="kt">void</span> <span class="n">run</span><span class="o">()</span> <span class="o">{</span>
+      <span class="kd">super</span><span class="o">.</span><span class="na">run</span><span class="o">();</span>
+      <span class="n">Observable</span><span class="o">.</span><span class="na">just</span><span class="o">(</span><span class="s">"hello"</span><span class="err">，</span> <span class="s">"my"</span><span class="err">，</span> <span class="s">"name"</span><span class="err">，</span> <span class="s">"is"</span><span class="err">，</span> <span class="s">"nichool"</span><span class="o">)</span>
+              <span class="o">.</span><span class="na">map</span><span class="o">(</span><span class="k">new</span> <span class="n">Func1</span><span class="o">&lt;</span><span class="n">String</span><span class="err">，</span> <span class="n">String</span><span class="o">&gt;()</span> <span class="o">{</span>
+                  <span class="nd">@Override</span>
+                  <span class="kd">public</span> <span class="n">String</span> <span class="n">call</span><span class="o">(</span><span class="n">String</span> <span class="n">s</span><span class="o">)</span> <span class="o">{</span>
+                      <span class="c1">//io线程中执行</span>
+                      <span class="n">LogUtils</span><span class="o">.</span><span class="na">LogW</span><span class="o">(</span><span class="s">"return "</span> <span class="o">+</span> <span class="s">" map: "</span> <span class="o">+</span> <span class="n">s</span> <span class="o">+</span> <span class="s">" "</span> <span class="o">+</span> <span class="n">Thread</span><span class="o">.</span><span class="na">currentThread</span><span class="o">().</span><span class="na">getName</span><span class="o">());</span>
+                      <span class="k">return</span> <span class="s">" map: "</span> <span class="o">+</span> <span class="n">s</span><span class="o">;</span>
+                  <span class="o">}</span>
+              <span class="o">})</span>
+              <span class="o">.</span><span class="na">subscribeOn</span><span class="o">(</span><span class="n">Schedulers</span><span class="o">.</span><span class="na">io</span><span class="o">())</span>
+              <span class="o">.</span><span class="na">observeOn</span><span class="o">(</span><span class="n">AndroidSchedulers</span><span class="o">.</span><span class="na">mainThread</span><span class="o">())</span>
+              <span class="o">.</span><span class="na">subscribe</span><span class="o">(</span><span class="k">new</span> <span class="n">Subscriber</span><span class="o">&lt;</span><span class="n">String</span><span class="o">&gt;()</span> <span class="o">{</span>
+                  <span class="nd">@Override</span>
+                  <span class="kd">public</span> <span class="kt">void</span> <span class="n">onStart</span><span class="o">()</span> <span class="o">{</span>
+                      <span class="c1">//new Thread 中执行</span>
+                      <span class="kd">super</span><span class="o">.</span><span class="na">onStart</span><span class="o">();</span>
+                      <span class="n">LogUtils</span><span class="o">.</span><span class="na">LogW</span><span class="o">(</span><span class="s">" onStart "</span> <span class="o">+</span> <span class="n">Thread</span><span class="o">.</span><span class="na">currentThread</span><span class="o">().</span><span class="na">getName</span><span class="o">());</span>
+                  <span class="o">}</span>
+
+                  <span class="nd">@Override</span>
+                  <span class="kd">public</span> <span class="kt">void</span> <span class="n">onCompleted</span><span class="o">()</span> <span class="o">{</span>
+                      <span class="c1">//主线程中执行</span>
+                      <span class="n">LogUtils</span><span class="o">.</span><span class="na">LogW</span><span class="o">(</span><span class="s">" onCompleted "</span> <span class="o">+</span> <span class="n">Thread</span><span class="o">.</span><span class="na">currentThread</span><span class="o">().</span><span class="na">getName</span><span class="o">());</span>
+                  <span class="o">}</span>
+
+                  <span class="nd">@Override</span>
+                  <span class="kd">public</span> <span class="kt">void</span> <span class="n">onError</span><span class="o">(</span><span class="n">Throwable</span> <span class="n">e</span><span class="o">)</span> <span class="o">{</span>
+                      <span class="c1">//主线程中执行</span>
+                      <span class="n">LogUtils</span><span class="o">.</span><span class="na">LogW</span><span class="o">(</span><span class="s">" onError "</span> <span class="o">+</span> <span class="n">Thread</span><span class="o">.</span><span class="na">currentThread</span><span class="o">().</span><span class="na">getName</span><span class="o">());</span>
+                  <span class="o">}</span>
+
+                  <span class="nd">@Override</span>
+                  <span class="kd">public</span> <span class="kt">void</span> <span class="n">onNext</span><span class="o">(</span><span class="n">String</span> <span class="n">s</span><span class="o">)</span> <span class="o">{</span>
+                      <span class="c1">//主线程中执行</span>
+                      <span class="n">LogUtils</span><span class="o">.</span><span class="na">LogW</span><span class="o">(</span><span class="s">" onNext( "</span> <span class="o">+</span> <span class="n">s</span> <span class="o">+</span> <span class="s">" ) "</span> <span class="o">+</span> <span class="n">Thread</span><span class="o">.</span><span class="na">currentThread</span><span class="o">().</span><span class="na">getName</span><span class="o">());</span>
+                  <span class="o">}</span>
+              <span class="o">});</span>
+  <span class="o">}</span>
+<span class="o">}.</span><span class="na">start</span><span class="o">();</span>
+</code></pre></div> <p>Log日志：</p> <div class="highlighter-rouge"><pre class="highlight"><code><span class="nl">RxJavaDemo:</span> <span class="n">onStart</span> <span class="n">Thread</span><span class="o">-</span><span class="mi">8</span>
+<span class="nl">RxJavaDemo:</span> <span class="k">return</span>  <span class="nl">map:</span> <span class="n">hello</span> <span class="n">RxIoScheduler</span><span class="o">-</span><span class="mi">2</span>
+<span class="o">...</span>
+<span class="nl">RxJavaDemo:</span>  <span class="n">onCompleted</span> <span class="n">main</span>
+</code></pre></div> <p>可以看出上面的<code class="highlighter-rouge">onStart</code>是运行在当前线程上的(<code class="highlighter-rouge">onStart</code>是在<code class="highlighter-rouge">subscribe()</code>时就被调用的)，也就是不在主线程上的。如果我们需要在<code class="highlighter-rouge">onStart</code>中执行Android上UI的显示(比如进度条显示出来并且设置进度为0)，则直接会报错误。</p> <p>解决办法: 使用<code class="highlighter-rouge">doOnSubscribe</code>与<code class="highlighter-rouge">subscribeOn</code>的组合在通知流程中额外添加一个处理来代替onStart。</p> <div class="highlighter-rouge"><pre class="highlight"><code><span class="k">new</span> <span class="nf">Thread</span><span class="p">(</span><span class="o">)</span> <span class="o">{</span>
+  <span class="nd">@Override</span>
+  <span class="kd">public</span> <span class="kt">void</span> <span class="n">run</span><span class="o">()</span> <span class="o">{</span>
+      <span class="kd">super</span><span class="o">.</span><span class="na">run</span><span class="o">();</span>
+      <span class="n">Observable</span><span class="o">.</span><span class="na">just</span><span class="o">(</span><span class="s">"hello"</span><span class="err">，</span> <span class="s">"my"</span><span class="err">，</span> <span class="s">"name"</span><span class="err">，</span> <span class="s">"is"</span><span class="err">，</span> <span class="s">"nichool"</span><span class="o">)</span>
+              <span class="o">.</span><span class="na">subscribeOn</span><span class="o">(</span><span class="n">Schedulers</span><span class="o">.</span><span class="na">io</span><span class="o">())</span>
+              <span class="o">.</span><span class="na">doOnSubscribe</span><span class="o">(</span><span class="k">new</span> <span class="n">Action0</span><span class="o">()</span> <span class="o">{</span>
+                  <span class="nd">@Override</span>
+                  <span class="kd">public</span> <span class="kt">void</span> <span class="n">call</span><span class="o">()</span> <span class="o">{</span>
+                      <span class="c1">//此处运行在主线程中 此处的call() 在Observable.call时就会调用。</span>
+                      <span class="n">LogUtils</span><span class="o">.</span><span class="na">LogW</span><span class="o">(</span><span class="s">" doOnSubscribe "</span> <span class="o">+</span> <span class="n">Thread</span><span class="o">.</span><span class="na">currentThread</span><span class="o">().</span><span class="na">getName</span><span class="o">());</span>
+                  <span class="o">}</span>
+              <span class="o">})</span>
+              <span class="o">.</span><span class="na">map</span><span class="o">(</span><span class="k">new</span> <span class="n">Func1</span><span class="o">&lt;</span><span class="n">String</span><span class="err">，</span> <span class="n">String</span><span class="o">&gt;()</span> <span class="o">{</span>
+                  <span class="nd">@Override</span>
+                  <span class="kd">public</span> <span class="n">String</span> <span class="n">call</span><span class="o">(</span><span class="n">String</span> <span class="n">s</span><span class="o">)</span> <span class="o">{</span>
+                      <span class="c1">//此处运行在IO线程中 此处的call()只有在发送流程时才会被调用。</span>
+                      <span class="n">LogUtils</span><span class="o">.</span><span class="na">LogW</span><span class="o">(</span><span class="s">"return "</span> <span class="o">+</span> <span class="s">" map: "</span> <span class="o">+</span> <span class="n">s</span> <span class="o">+</span> <span class="s">" "</span> <span class="o">+</span> <span class="n">Thread</span><span class="o">.</span><span class="na">currentThread</span><span class="o">().</span><span class="na">getName</span><span class="o">());</span>
+                      <span class="k">return</span> <span class="s">" map: "</span> <span class="o">+</span> <span class="n">s</span><span class="o">;</span>
+                  <span class="o">}</span>
+              <span class="o">})</span>
+              <span class="o">.</span><span class="na">subscribeOn</span><span class="o">(</span><span class="n">AndroidSchedulers</span><span class="o">.</span><span class="na">mainThread</span><span class="o">())</span>
+              <span class="o">.</span><span class="na">observeOn</span><span class="o">(</span><span class="n">AndroidSchedulers</span><span class="o">.</span><span class="na">mainThread</span><span class="o">())</span>
+              <span class="o">.</span><span class="na">subscribe</span><span class="o">(</span><span class="k">new</span> <span class="n">Subscriber</span><span class="o">&lt;</span><span class="n">String</span><span class="o">&gt;()</span> <span class="o">{</span>
+                  <span class="nd">@Override</span>
+                  <span class="kd">public</span> <span class="kt">void</span> <span class="n">onStart</span><span class="o">()</span> <span class="o">{</span>
+                      <span class="kd">super</span><span class="o">.</span><span class="na">onStart</span><span class="o">();</span>
+                      <span class="n">LogUtils</span><span class="o">.</span><span class="na">LogW</span><span class="o">(</span><span class="s">" onStart "</span> <span class="o">+</span> <span class="n">Thread</span><span class="o">.</span><span class="na">currentThread</span><span class="o">().</span><span class="na">getName</span><span class="o">());</span>
+                  <span class="o">}</span>
+
+                  <span class="nd">@Override</span>
+                  <span class="kd">public</span> <span class="kt">void</span> <span class="n">onCompleted</span><span class="o">()</span> <span class="o">{</span>
+                      <span class="n">LogUtils</span><span class="o">.</span><span class="na">LogW</span><span class="o">(</span><span class="s">" onCompleted "</span> <span class="o">+</span> <span class="n">Thread</span><span class="o">.</span><span class="na">currentThread</span><span class="o">().</span><span class="na">getName</span><span class="o">());</span>
+                  <span class="o">}</span>
+
+                  <span class="nd">@Override</span>
+                  <span class="kd">public</span> <span class="kt">void</span> <span class="n">onError</span><span class="o">(</span><span class="n">Throwable</span> <span class="n">e</span><span class="o">)</span> <span class="o">{</span>
+                      <span class="n">LogUtils</span><span class="o">.</span><span class="na">LogW</span><span class="o">(</span><span class="s">" onError "</span> <span class="o">+</span> <span class="n">Thread</span><span class="o">.</span><span class="na">currentThread</span><span class="o">().</span><span class="na">getName</span><span class="o">());</span>
+                  <span class="o">}</span>
+
+                  <span class="nd">@Override</span>
+                  <span class="kd">public</span> <span class="kt">void</span> <span class="n">onNext</span><span class="o">(</span><span class="n">String</span> <span class="n">s</span><span class="o">)</span> <span class="o">{</span>
+                      <span class="n">LogUtils</span><span class="o">.</span><span class="na">LogW</span><span class="o">(</span><span class="s">" onNext( "</span> <span class="o">+</span> <span class="n">s</span> <span class="o">+</span> <span class="s">" ) "</span> <span class="o">+</span> <span class="n">Thread</span><span class="o">.</span><span class="na">currentThread</span><span class="o">().</span><span class="na">getName</span><span class="o">());</span>
+                  <span class="o">}</span>
+              <span class="o">});</span>
+        <span class="o">}</span>
+    <span class="o">}.</span><span class="na">start</span><span class="o">();</span>
+</code></pre></div> <p>原理 : 1. <code class="highlighter-rouge">doOnSubscribe</code>创建了一个<code class="highlighter-rouge">Observable</code>， 当执行通知流程时会调用这个<code class="highlighter-rouge">Observable.call()</code>方法，内部会调用这个重写的call方法. 2. <code class="highlighter-rouge">subscribeOn（AndroidSchedulers.mainThread()</code> 与 <code class="highlighter-rouge">subscribeOn(Schedulers.io())</code>使线程切换了两次，先是切换成AndroidSchedulers.mainThread()，然后执行完doOnSubscribe中的call()，又切换成Schedulers.io()，然后进入发送流程，然后执行map操作。</p> <hr /> <p><strong>上述分析请结合更详细的源码，这样有有助于更好地理解</strong> 分析过程中如若存在错误，请在下方评论处给予指正。</p> <br> <a href="https://twitter.com/intent/tweet?text=/rxjava%E7%BA%BF%E7%A8%8B%E8%B0%83%E5%BA%A6%E7%9A%84%E7%90%86%E8%A7%A3/" class="btn btn_twitter" title="Share on Twitter"><i class="fa fa-fw fa-twitter" aria-hidden="true"></i><span> Twitter</span></a> <a href="https://www.facebook.com/sharer/sharer.php?u=/rxjava%E7%BA%BF%E7%A8%8B%E8%B0%83%E5%BA%A6%E7%9A%84%E7%90%86%E8%A7%A3/" class="btn btn_facebook" title="Share on Facebook"><i class="fa fa-fw fa-facebook" aria-hidden="true"></i><span> Facebook</span></a> <a href="https://plus.google.com/share?url=/rxjava%E7%BA%BF%E7%A8%8B%E8%B0%83%E5%BA%A6%E7%9A%84%E7%90%86%E8%A7%A3/" class="btn btn_google-plus" title="Share on Google Plus"><i class="fa fa-fw fa-google-plus" aria-hidden="true"></i><span> Google+</span></a> <nav class="pagination"> <a href="/rxjava%E5%8F%98%E6%8D%A2%E7%9A%84%E6%B7%B1%E5%85%A5%E7%90%86%E8%A7%A3/" class="pagination_pager" title="RxJava 对于’变换‘的理解 ">previous</a> <a href="#" class="pagination_pager disabled">next</a> </nav> </div> </div> <!-- JS --> <script src="/assets/js/main.min.js"></script> <div class="overlay"> <ul class="projects-menu"> <li style="background:url(http://taylantatli.me/Halve/images/halve-home-image.png) center center no-repeat;"> <a href="http://taylantatli.me/Halve" class="inactive" target="_blank" rel="nofollow external"> <span> Halve Jekyll Theme <br><em>in progress</em> </span> </a> </li> <li style="background:url(https://cloud.githubusercontent.com/assets/754514/14509720/61c61058-01d6-11e6-93ab-0918515ecd56.png) center center no-repeat;"> <a href="http://taylantatli.me/Moon" target="_blank" rel="nofollow external"> <span> Moon Jekyll Theme </span> </a> </li> <li style="background:url(https://raw.githubusercontent.com/TaylanTatli/Ramme/master/assets/img/screenshot-post.png) center center no-repeat;"> <a href="http://taylantatli.me/Ramme" target="_blank" rel="nofollow external"> <span> Ramme Jekyll Theme </span> </a> </li> <li style="background:url(https://raw.githubusercontent.com/TaylanTatli/Daisy-Pelican-Theme/master/Preview-1.png) center center no-repeat;"> <a href="http://taylantatli.me/Daisy-Pelican-Theme/" target="_blank" rel="nofollow external"> <span> Daisy Pelican Theme </span> </a> </li> <li style="background:url(https://raw.githubusercontent.com/TaylanTatli/Block-Icon-Theme/master/Preview.png) center center no-repeat;"> <a href="https://github.com/TaylanTatli/Block-Icon-Theme" class="inactive" target="_blank" rel="nofollow external"> <span> Block Icon Theme <br><em>in progress</em> </span> </a> </li> <li style="background:url(https://raw.githubusercontent.com/TaylanTatli/StartPage/master/preview.png) center center no-repeat;"> <a href="http://taylantatli.me/StartPage/" class="inactive" target="_blank" rel="nofollow external"> <span> Start Page <br><em>in progress</em> </span> </a> </li> </ul> </div> </body> </html>
